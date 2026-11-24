@@ -1,0 +1,1691 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Chat Client</title>
+  <style>
+    :root, [data-theme="dark"] {
+      --bg: #000000;
+      --topbar-bg: rgba(0, 0, 0, 0.92);
+      --sidebar: #0a0a0a;
+      --panel: #121212;
+      --input-bg: #080808;
+      --border: #262626;
+      --text: #f5f5f5;
+      --muted: #8e8e8e;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --user-msg: #2563eb;
+      --user-text: #ffffff;
+      --ai-msg: #111111;
+      --code-bg: #080808;
+      --code-header: #161616;
+      --inline-code: rgba(255, 255, 255, 0.11);
+      --quote-bg: rgba(255, 255, 255, 0.04);
+      --table-alt: rgba(255, 255, 255, 0.03);
+      --hover-bg: rgba(255, 255, 255, 0.07);
+      --active-bg: rgba(59, 130, 246, 0.22);
+      --danger: #ef4444;
+      --success: #10b981;
+    }
+
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --topbar-bg: rgba(255, 255, 255, 0.92);
+      --sidebar: #f1f5f9;
+      --panel: #ffffff;
+      --input-bg: #f8fafc;
+      --border: #cbd5e1;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --user-msg: #2563eb;
+      --user-text: #ffffff;
+      --ai-msg: #ffffff;
+      --code-bg: #1e293b;
+      --code-header: #0f172a;
+      --inline-code: rgba(15, 23, 42, 0.08);
+      --quote-bg: rgba(15, 23, 42, 0.04);
+      --table-alt: rgba(15, 23, 42, 0.025);
+      --hover-bg: rgba(15, 23, 42, 0.05);
+      --active-bg: rgba(37, 99, 235, 0.12);
+      --danger: #dc2626;
+      --success: #059669;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    /* 可收缩侧边栏 */
+    .sidebar {
+      width: 270px;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+      transition: width 0.22s ease, border-color 0.22s ease;
+    }
+    .sidebar-inner {
+      width: 270px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      gap: 12px;
+    }
+    body.sidebar-collapsed .sidebar {
+      width: 0;
+      border-right-color: transparent;
+    }
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 40;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 14px;
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--primary-hover); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover { background: var(--hover-bg); }
+    .btn-danger {
+      background: transparent;
+      border: 1px solid var(--danger);
+      color: var(--danger);
+    }
+    .btn-danger:hover { background: rgba(239, 68, 68, 0.1); }
+    .btn-sm { padding: 6px 10px; font-size: 12.5px; }
+    .btn-icon {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      flex-shrink: 0;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-icon:hover { background: var(--hover-bg); border-color: var(--primary); }
+
+    .chat-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .chat-item {
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .chat-item:hover { background: var(--hover-bg); color: var(--text); }
+    .chat-item.active { background: var(--active-bg); color: var(--primary); font-weight: 600; }
+    .chat-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .del-chat {
+      opacity: 0.6;
+      font-size: 13px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .del-chat:hover { opacity: 1; background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+    /* 主区域 */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .topbar {
+      height: 54px;
+      border-bottom: 1px solid var(--border);
+      padding: 0 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: var(--topbar-bg);
+    }
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .model-select-top {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 12.5px;
+      max-width: 240px;
+      outline: none;
+      cursor: pointer;
+    }
+    .model-select-top:focus { border-color: var(--primary); }
+    .status-badge {
+      font-size: 12px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 260px;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .msg-row {
+      display: flex;
+      flex-direction: column;
+      max-width: 840px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .msg-row.user { align-items: flex-end; }
+    .msg-row.assistant { align-items: flex-start; }
+    .msg-role {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 4px;
+      padding: 0 4px;
+    }
+    .bubble {
+      padding: 13px 17px;
+      border-radius: 12px;
+      font-size: 14.5px;
+      line-height: 1.7;
+      word-break: break-word;
+      max-width: 100%;
+    }
+    .user .bubble {
+      background: var(--user-msg);
+      color: var(--user-text);
+      border-bottom-right-radius: 4px;
+    }
+    .user-text-body {
+      white-space: pre-wrap;
+    }
+    .msg-images {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .msg-images:last-child {
+      margin-bottom: 0;
+    }
+    .msg-images img {
+      max-width: 220px;
+      max-height: 220px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      cursor: zoom-in;
+      background: #000;
+    }
+    .assistant .bubble {
+      background: var(--ai-msg);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+      width: 100%;
+    }
+
+    /* 完整 Markdown 排版样式 */
+    .bubble > *:first-child { margin-top: 0 !important; }
+    .bubble > *:last-child { margin-bottom: 0 !important; }
+    .bubble p { margin: 10px 0; }
+    .bubble h1, .bubble h2, .bubble h3, .bubble h4, .bubble h5, .bubble h6 {
+      margin: 16px 0 8px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+    .bubble h1 { font-size: 1.45em; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+    .bubble h2 { font-size: 1.28em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+    .bubble h3 { font-size: 1.14em; }
+    .bubble h4 { font-size: 1.03em; }
+    .bubble ul, .bubble ol { margin: 8px 0 8px 22px; }
+    .bubble li { margin: 4px 0; }
+    .bubble blockquote {
+      margin: 10px 0;
+      padding: 8px 14px;
+      border-left: 3px solid var(--primary);
+      background: var(--quote-bg);
+      color: var(--muted);
+      border-radius: 0 6px 6px 0;
+    }
+    .bubble hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 14px 0;
+    }
+    .bubble a {
+      color: var(--primary);
+      text-decoration: underline;
+    }
+    .bubble code {
+      background: var(--inline-code);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+    }
+    .table-wrap {
+      margin: 12px 0;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .bubble table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+    .bubble th, .bubble td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      text-align: left;
+    }
+    .bubble th:last-child, .bubble td:last-child { border-right: none; }
+    .bubble tr:last-child td { border-bottom: none; }
+    .bubble th { background: var(--quote-bg); font-weight: 600; }
+    .bubble tr:nth-child(even) td { background: var(--table-alt); }
+
+    /* 代码块 */
+    .code-wrap {
+      margin: 12px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+      color: #f1f5f9;
+    }
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 12px;
+      background: var(--code-header);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid #404040;
+      color: #f1f5f9;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: rgba(255, 255, 255, 0.12); }
+    .code-wrap pre {
+      padding: 12px;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .code-wrap pre code { background: none; padding: 0; color: inherit; }
+
+    /* 数学公式排版样式 */
+    .math-inline {
+      font-family: "Cambria Math", "STIX Two Math", "Times New Roman", Georgia, serif;
+      font-size: 1.06em;
+      padding: 0 2px;
+    }
+    .math-block {
+      font-family: "Cambria Math", "STIX Two Math", "Times New Roman", Georgia, serif;
+      font-size: 1.15em;
+      margin: 12px 0;
+      padding: 12px 16px;
+      background: var(--quote-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow-x: auto;
+      text-align: center;
+    }
+    .math-var { font-style: italic; }
+    .math-frac {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      vertical-align: middle;
+      margin: 0 3px;
+      font-size: 0.9em;
+      line-height: 1.15;
+    }
+    .math-num {
+      padding: 0 4px 2px;
+      border-bottom: 1px solid currentColor;
+    }
+    .math-den {
+      padding: 2px 4px 0;
+    }
+    .math-sqrt {
+      display: inline-flex;
+      align-items: baseline;
+    }
+    .math-sqrt-rad {
+      border-top: 1px solid currentColor;
+      padding: 1px 3px 0 2px;
+      margin-left: 1px;
+    }
+    .math-op-stack {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      vertical-align: middle;
+      margin: 0 2px;
+      line-height: 1;
+    }
+    .math-op-sup, .math-op-sub { font-size: 0.68em; }
+    .math-op-sym { font-size: 1.25em; }
+    .math-matrix {
+      display: inline-table;
+      vertical-align: middle;
+      border-collapse: collapse;
+      margin: 0 3px;
+    }
+    .math-matrix td {
+      border: none !important;
+      background: none !important;
+      padding: 2px 6px !important;
+      text-align: center !important;
+    }
+    .math-bracket {
+      font-size: 1.4em;
+      vertical-align: middle;
+      font-weight: 300;
+    }
+
+    /* 输入框与图片预览区 */
+    .input-area {
+      border-top: 1px solid var(--border);
+      padding: 14px 20px;
+      background: var(--bg);
+    }
+    .input-wrapper {
+      max-width: 840px;
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .input-wrapper:focus-within, .input-wrapper.drag-over {
+      border-color: var(--primary);
+    }
+    .input-wrapper.drag-over {
+      background: var(--active-bg);
+    }
+    .preview-strip {
+      display: none;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding-bottom: 10px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .preview-strip.has-items {
+      display: flex;
+    }
+    .preview-item {
+      position: relative;
+      width: 68px;
+      height: 68px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #000;
+    }
+    .preview-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .preview-remove {
+      position: absolute;
+      top: 3px;
+      right: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.78);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      font-size: 11px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .preview-remove:hover {
+      background: var(--danger);
+    }
+    .input-box {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 14.5px;
+      line-height: 1.5;
+      resize: none;
+      max-height: 180px;
+      outline: none;
+      font-family: inherit;
+      padding: 6px 0;
+    }
+
+    /* 设置弹窗 & 图片灯箱 */
+    .modal-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.76);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+    .modal-mask.open { display: flex; }
+    .modal {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 500px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    }
+    .modal h3 { font-size: 16px; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+    .field input, .field textarea, .field select {
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: var(--text);
+      font-size: 13.5px;
+      outline: none;
+      width: 100%;
+    }
+    .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--primary); }
+    .input-row { display: flex; gap: 8px; align-items: center; }
+    .hint { font-size: 11.5px; color: var(--muted); word-break: break-all; }
+    .hint.ok { color: var(--success); }
+    .hint.err { color: var(--danger); }
+    .row-between { display: flex; justify-content: space-between; align-items: center; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+
+    .lightbox-img {
+      max-width: 92vw;
+      max-height: 90vh;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      cursor: zoom-out;
+    }
+
+    /* 窄屏抽屉式侧边栏适配 */
+    @media (max-width: 760px) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 50;
+      }
+      body:not(.sidebar-collapsed) .sidebar-backdrop {
+        display: block;
+      }
+      .status-badge { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-inner">
+      <button class="btn" id="newChatBtn">+ 新建对话</button>
+      <div class="chat-list" id="chatList"></div>
+      <button class="btn btn-outline" id="openSettingsBtn">⚙ API 与模型设置</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button type="button" class="btn-icon" id="toggleSidebarBtn" title="收起/展开侧边栏">☰</button>
+        <select class="model-select-top" id="topModelSelect" title="选择或切换模型"></select>
+        <span class="status-badge" id="endpointBadge">未配置 API</span>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-outline btn-sm" id="themeToggleBtn" title="切换浅色/纯黑主题">☀️ 浅色</button>
+        <button class="btn btn-outline btn-sm" id="topSettingsBtn">配置 API</button>
+        <button class="btn btn-danger btn-sm" id="clearMsgBtn">清空</button>
+      </div>
+    </header>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="input-area">
+      <div class="input-wrapper" id="inputWrapper">
+        <div class="preview-strip" id="previewStrip"></div>
+        <div class="input-box">
+          <input type="file" id="imageFileInput" accept="image/*" multiple hidden />
+          <button type="button" class="btn-icon" id="uploadImgBtn" title="上传图片（也可直接 Ctrl+V 粘贴或拖拽图片到此）">🖼️</button>
+          <textarea id="promptInput" rows="1" placeholder="输入问题，或粘贴/拖拽/点击左侧图标上传图片... (Enter 发送，Shift+Enter 换行)"></textarea>
+          <button class="btn" id="sendBtn">发送</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- API 配置弹窗 -->
+  <div class="modal-mask" id="settingsModal">
+    <div class="modal">
+      <h3>自定义 API 配置（兼容 OpenAI 格式）</h3>
+      <div class="field">
+        <label>API Base URL（接口地址）</label>
+        <input type="text" id="cfgBaseUrl" placeholder="例如: https://api.openai.com/v1" />
+        <div class="hint" id="resolvedUrlHint">对话接口: -</div>
+      </div>
+      <div class="field">
+        <label>API Key（密钥，仅保存在本地浏览器）</label>
+        <input type="password" id="cfgApiKey" placeholder="sk-..." />
+      </div>
+      <div class="field">
+        <label>Model（点击右侧按钮从接口拉取，或直接手动输入）</label>
+        <div class="input-row">
+          <select id="cfgModelSelect" style="flex:1;">
+            <option value="">-- 尚未拉取模型列表 --</option>
+          </select>
+          <button type="button" class="btn btn-outline" id="fetchModelsBtn">拉取模型</button>
+        </div>
+        <input type="text" id="cfgModelInput" placeholder="手动输入模型名，例如: gpt-4o / deepseek-chat" />
+        <div class="hint" id="fetchStatusHint">提示：支持标准 /v1/models 接口自动获取列表</div>
+      </div>
+      <div class="field">
+        <label>System Prompt（系统提示词，可选）</label>
+        <textarea id="cfgSystem" rows="2" placeholder="你是一个有帮助的助手。"></textarea>
+      </div>
+      <div class="row-between">
+        <label style="font-size:13px;color:var(--text);display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="cfgStream" checked /> 启用流式输出 (Stream)
+        </label>
+        <span class="hint">公司代理异常时可取消勾选</span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="closeSettingsBtn">取消</button>
+        <button class="btn" id="saveSettingsBtn">保存配置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 图片大图预览灯箱 -->
+  <div class="modal-mask" id="lightboxModal">
+    <img class="lightbox-img" id="lightboxImg" src="" alt="预览大图" />
+  </div>
+
+  <script>
+    const STORAGE_CFG = 'gh_ai_cfg_v2';
+    const STORAGE_CHATS = 'gh_ai_chats_v1';
+    const STORAGE_THEME = 'gh_ai_theme_v1';
+    const STORAGE_SIDEBAR = 'gh_ai_sidebar_v1';
+
+    let config = JSON.parse(localStorage.getItem(STORAGE_CFG) || 'null') || {
+      baseUrl: 'https://api.openai.com/v1',
+      apiKey: '',
+      model: 'gpt-4o-mini',
+      models: [],
+      system: '',
+      stream: true
+    };
+
+    let chats = JSON.parse(localStorage.getItem(STORAGE_CHATS) || '[]');
+    let currentChatId = chats[0]?.id || null;
+    let pendingImages = [];
+    let abortController = null;
+
+    const $ = id => document.getElementById(id);
+
+    /* 侧边栏收缩控制 */
+    function applySidebarState(collapsed) {
+      document.body.classList.toggle('sidebar-collapsed', !!collapsed);
+      localStorage.setItem(STORAGE_SIDEBAR, collapsed ? '1' : '0');
+      $('toggleSidebarBtn').title = collapsed ? '展开侧边栏' : '收起侧边栏';
+    }
+
+    $('toggleSidebarBtn').onclick = () => {
+      const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+      applySidebarState(!isCollapsed);
+    };
+
+    $('sidebarBackdrop').onclick = () => applySidebarState(true);
+
+    /* 主题切换（纯黑 / 浅色） */
+    function applyTheme(theme) {
+      const target = theme === 'light' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem(STORAGE_THEME, target);
+      $('themeToggleBtn').textContent = target === 'dark' ? '☀️ 浅色' : '🌑 纯黑';
+    }
+
+    $('themeToggleBtn').onclick = () => {
+      const current = document.documentElement.getAttribute('data-theme');
+      applyTheme(current === 'dark' ? 'light' : 'dark');
+    };
+
+    /* 地址解析 */
+    function normalizeBaseUrl(raw) {
+      let url = (raw || '').trim().replace(/\/+$/, '');
+      if (url.endsWith('/chat/completions')) {
+        url = url.slice(0, -'/chat/completions'.length);
+      }
+      return url;
+    }
+
+    function resolveChatEndpoint(raw) {
+      const base = normalizeBaseUrl(raw);
+      return base ? `${base}/chat/completions` : '';
+    }
+
+    function resolveModelsEndpoint(raw) {
+      const base = normalizeBaseUrl(raw);
+      return base ? `${base}/models` : '';
+    }
+
+    function saveConfig() {
+      localStorage.setItem(STORAGE_CFG, JSON.stringify(config));
+    }
+
+    function saveChats() {
+      try {
+        localStorage.setItem(STORAGE_CHATS, JSON.stringify(chats));
+      } catch (e) {
+        for (let i = chats.length - 1; i >= 0; i--) {
+          let freed = false;
+          for (const m of chats[i].messages) {
+            if (m.images && m.images.length) {
+              delete m.images;
+              freed = true;
+            }
+          }
+          if (freed) {
+            try {
+              localStorage.setItem(STORAGE_CHATS, JSON.stringify(chats));
+              return;
+            } catch (_) {}
+          }
+        }
+      }
+    }
+
+    /* 图片处理：文件读取、自动缩放压缩、粘贴、拖拽与预览 */
+    function compressImageFile(file, maxDim = 1600, quality = 0.85) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('读取图片失败'));
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onerror = () => reject(new Error('解析图片失败'));
+          img.onload = () => {
+            let { width, height } = img;
+            if (width <= maxDim && height <= maxDim && file.size < 800 * 1024) {
+              resolve(e.target.result);
+              return;
+            }
+            if (width > maxDim || height > maxDim) {
+              if (width >= height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            const outType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+            resolve(canvas.toDataURL(outType, quality));
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function handleImageFiles(fileList) {
+      const files = Array.from(fileList || []).filter(f => f.type && f.type.startsWith('image/'));
+      if (!files.length) return;
+      for (const file of files) {
+        try {
+          const dataUrl = await compressImageFile(file);
+          pendingImages.push(dataUrl);
+        } catch (err) {
+          alert(`图片 "${file.name}" 处理失败: ${err.message}`);
+        }
+      }
+      renderPendingPreviews();
+    }
+
+    function renderPendingPreviews() {
+      const strip = $('previewStrip');
+      strip.innerHTML = '';
+      if (pendingImages.length === 0) {
+        strip.classList.remove('has-items');
+        return;
+      }
+      strip.classList.add('has-items');
+      pendingImages.forEach((src, idx) => {
+        const item = document.createElement('div');
+        item.className = 'preview-item';
+        item.innerHTML = `<img src="${src}" alt="待发送图片" /><button type="button" class="preview-remove" title="移除">✕</button>`;
+        item.querySelector('img').onclick = () => openLightbox(src);
+        item.querySelector('.preview-remove').onclick = () => {
+          pendingImages.splice(idx, 1);
+          renderPendingPreviews();
+        };
+        strip.appendChild(item);
+      });
+    }
+
+    $('uploadImgBtn').onclick = () => $('imageFileInput').click();
+    $('imageFileInput').onchange = (e) => {
+      handleImageFiles(e.target.files);
+      e.target.value = '';
+    };
+
+    $('promptInput').addEventListener('paste', (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const imgFiles = [];
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) imgFiles.push(file);
+        }
+      }
+      if (imgFiles.length > 0) {
+        e.preventDefault();
+        handleImageFiles(imgFiles);
+      }
+    });
+
+    const inputWrapper = $('inputWrapper');
+    inputWrapper.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      inputWrapper.classList.add('drag-over');
+    });
+    inputWrapper.addEventListener('dragleave', () => {
+      inputWrapper.classList.remove('drag-over');
+    });
+    inputWrapper.addEventListener('drop', (e) => {
+      e.preventDefault();
+      inputWrapper.classList.remove('drag-over');
+      if (e.dataTransfer?.files?.length) {
+        handleImageFiles(e.dataTransfer.files);
+      }
+    });
+
+    function openLightbox(src) {
+      $('lightboxImg').src = src;
+      $('lightboxModal').classList.add('open');
+    }
+    $('lightboxModal').onclick = () => $('lightboxModal').classList.remove('open');
+
+    /* 同步模型下拉框 */
+    function renderModelSelectors() {
+      const list = Array.isArray(config.models) ? [...config.models] : [];
+      if (config.model && !list.includes(config.model)) {
+        list.unshift(config.model);
+      }
+
+      const topSel = $('topModelSelect');
+      topSel.innerHTML = '';
+      if (list.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '未选择模型（点击右侧配置）';
+        topSel.appendChild(opt);
+      } else {
+        list.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = m;
+          if (m === config.model) opt.selected = true;
+          topSel.appendChild(opt);
+        });
+      }
+
+      const modalSel = $('cfgModelSelect');
+      modalSel.innerHTML = '';
+      if (list.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '-- 点击右侧“拉取模型”获取列表 --';
+        modalSel.appendChild(opt);
+      } else {
+        list.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = m;
+          if (m === $('cfgModelInput').value.trim()) opt.selected = true;
+          modalSel.appendChild(opt);
+        });
+      }
+
+      const ep = resolveChatEndpoint(config.baseUrl);
+      $('endpointBadge').textContent = config.apiKey ? ep : '未配置 API Key';
+    }
+
+    $('topModelSelect').onchange = (e) => {
+      if (!e.target.value) {
+        openSettings();
+        return;
+      }
+      config.model = e.target.value;
+      saveConfig();
+    };
+
+    $('cfgModelSelect').onchange = (e) => {
+      if (e.target.value) {
+        $('cfgModelInput').value = e.target.value;
+      }
+    };
+
+    $('cfgModelInput').oninput = (e) => {
+      const val = e.target.value.trim();
+      const sel = $('cfgModelSelect');
+      const found = Array.from(sel.options).some(o => o.value === val);
+      if (found) sel.value = val;
+    };
+
+    /* 拉取模型列表 */
+    $('fetchModelsBtn').onclick = async () => {
+      const baseUrl = $('cfgBaseUrl').value.trim();
+      const apiKey = $('cfgApiKey').value.trim();
+      const modelsUrl = resolveModelsEndpoint(baseUrl);
+      const hint = $('fetchStatusHint');
+
+      if (!modelsUrl || !apiKey) {
+        hint.className = 'hint err';
+        hint.textContent = '请先填写 API Base URL 和 API Key 再拉取模型。';
+        return;
+      }
+
+      const btn = $('fetchModelsBtn');
+      btn.disabled = true;
+      btn.textContent = '拉取中...';
+      hint.className = 'hint';
+      hint.textContent = `正在请求 ${modelsUrl} ...`;
+
+      try {
+        const res = await fetch(modelsUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errText.slice(0, 150)}`);
+        }
+
+        const data = await res.json();
+        const rawList = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+        const ids = rawList
+          .map(item => typeof item === 'string' ? item : item.id)
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b));
+
+        if (ids.length === 0) {
+          throw new Error('接口返回成功，但模型列表为空，请手动输入模型名。');
+        }
+
+        config.models = ids;
+        const currentInput = $('cfgModelInput').value.trim();
+        if (!currentInput || !ids.includes(currentInput)) {
+          $('cfgModelInput').value = ids[0];
+        }
+
+        renderModelSelectors();
+        $('cfgModelSelect').value = $('cfgModelInput').value.trim();
+
+        hint.className = 'hint ok';
+        hint.textContent = `成功拉取 ${ids.length} 个模型，已填充到下拉列表。`;
+      } catch (err) {
+        hint.className = 'hint err';
+        hint.textContent = `拉取失败：${err.message}（可直接在下方手动输入模型名）`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '拉取模型';
+      }
+    };
+
+    /* 会话管理 */
+    function createNewChat() {
+      const chat = { id: Date.now().toString(), title: '新对话', messages: [] };
+      chats.unshift(chat);
+      currentChatId = chat.id;
+      saveChats();
+      renderChatList();
+      renderMessages();
+      if (window.innerWidth <= 760) applySidebarState(true);
+    }
+
+    function getCurrentChat() {
+      if (!currentChatId) createNewChat();
+      let chat = chats.find(c => c.id === currentChatId);
+      if (!chat) {
+        createNewChat();
+        chat = chats[0];
+      }
+      return chat;
+    }
+
+    function renderChatList() {
+      const list = $('chatList');
+      list.innerHTML = '';
+      chats.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'chat-item' + (c.id === currentChatId ? ' active' : '');
+        div.innerHTML = `<span class="chat-title">${escapeHtml(c.title)}</span><span class="del-chat" title="删除">✕</span>`;
+        div.onclick = (e) => {
+          if (e.target.classList.contains('del-chat')) {
+            chats = chats.filter(x => x.id !== c.id);
+            if (currentChatId === c.id) currentChatId = chats[0]?.id || null;
+            saveChats();
+            renderChatList();
+            renderMessages();
+            return;
+          }
+          currentChatId = c.id;
+          renderChatList();
+          renderMessages();
+          if (window.innerWidth <= 760) applySidebarState(true);
+        };
+        list.appendChild(div);
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    }
+
+    /* 零依赖 LaTeX 数学公式渲染器 */
+    const TEX_SYMBOLS = {
+      alpha:'α', beta:'β', gamma:'γ', delta:'δ', epsilon:'ε', varepsilon:'ϵ',
+      zeta:'ζ', eta:'η', theta:'θ', vartheta:'ϑ', iota:'ι', kappa:'κ',
+      lambda:'λ', mu:'μ', nu:'ν', xi:'ξ', pi:'π', varpi:'ϖ',
+      rho:'ρ', varrho:'ϱ', sigma:'σ', varsigma:'ς', tau:'τ', upsilon:'υ',
+      phi:'φ', varphi:'ϕ', chi:'χ', psi:'ψ', omega:'ω',
+      Gamma:'Γ', Delta:'Δ', Theta:'Θ', Lambda:'Λ', Xi:'Ξ', Pi:'Π',
+      Sigma:'Σ', Upsilon:'Υ', Phi:'Φ', Psi:'Ψ', Omega:'Ω',
+      infty:'∞', partial:'∂', nabla:'∇', pm:'±', mp:'∓', times:'×',
+      div:'÷', cdot:'·', ast:'∗', star:'⋆', circ:'∘', bullet:'•',
+      leq:'≤', le:'≤', geq:'≥', ge:'≥', neq:'≠', ne:'≠', approx:'≈',
+      equiv:'≡', sim:'∼', simeq:'≃', cong:'≅', propto:'∝',
+      ll:'≪', gg:'≫', subset:'⊂', supset:'⊃', subseteq:'⊆', supseteq:'⊇',
+      in:'∈', notin:'∉', ni:'∋', cup:'∪', cap:'∩', emptyset:'∅', varnothing:'∅',
+      forall:'∀', exists:'∃', nexists:'∄', neg:'¬', lnot:'¬',
+      land:'∧', wedge:'∧', lor:'∨', vee:'∨',
+      rightarrow:'→', to:'→', leftarrow:'←', leftrightarrow:'↔',
+      Rightarrow:'⇒', Leftarrow:'⇐', Leftrightarrow:'⇔', iff:'⇔', mapsto:'↦',
+      angle:'∠', triangle:'△', perp:'⊥', parallel:'∥', degree:'°',
+      cdots:'⋯', ldots:'…', vdots:'⋮', ddots:'⋱', prime:'′',
+      hbar:'ℏ', ell:'ℓ', Re:'ℜ', Im:'ℑ', aleph:'ℵ'
+    };
+
+    function readBraceGroup(str, pos) {
+      while (pos < str.length && str[pos] === ' ') pos++;
+      if (pos >= str.length) return ['', pos];
+      if (str[pos] !== '{') {
+        if (str[pos] === '\\') {
+          const m = str.slice(pos).match(/^\\[a-zA-Z]+/);
+          if (m) return [m[0], pos + m[0].length];
+        }
+        return [str[pos], pos + 1];
+      }
+      let depth = 0, start = pos + 1;
+      for (let i = pos; i < str.length; i++) {
+        if (str[i] === '{') depth++;
+        else if (str[i] === '}') {
+          depth--;
+          if (depth === 0) return [str.slice(start, i), i + 1];
+        }
+      }
+      return [str.slice(start), str.length];
+    }
+
+    function parseTexExpr(tex) {
+      let out = '';
+      let i = 0;
+      while (i < tex.length) {
+        const ch = tex[i];
+
+        if (tex.startsWith('\\begin{', i)) {
+          const endEnv = tex.indexOf('}', i + 7);
+          if (endEnv !== -1) {
+            const env = tex.slice(i + 7, endEnv);
+            const closeTag = `\\end{${env}}`;
+            const closeIdx = tex.indexOf(closeTag, endEnv + 1);
+            if (closeIdx !== -1) {
+              const body = tex.slice(endEnv + 1, closeIdx);
+              const rows = body.split(/\\\\/).map(r => r.trim()).filter(Boolean);
+              const rowsHtml = rows.map(r => {
+                const cols = r.split('&').map(c => `<td>${parseTexExpr(c.trim())}</td>`).join('');
+                return `<tr>${cols}</tr>`;
+              }).join('');
+              const [lBr, rBr] = env === 'bmatrix' ? ['[', ']']
+                : env === 'vmatrix' ? ['|', '|']
+                : env === 'cases' ? ['{', '']
+                : ['(', ')'];
+              out += `${lBr ? `<span class="math-bracket">${lBr}</span>` : ''}` +
+                     `<table class="math-matrix">${rowsHtml}</table>` +
+                     `${rBr ? `<span class="math-bracket">${rBr}</span>` : ''}`;
+              i = closeIdx + closeTag.length;
+              continue;
+            }
+          }
+        }
+
+        if (ch === '\\') {
+          const cmdMatch = tex.slice(i).match(/^\\([a-zA-Z]+|[^a-zA-Z\s])/);
+          if (cmdMatch) {
+            const cmd = cmdMatch[1];
+            i += cmdMatch[0].length;
+
+            if (cmd === 'frac' || cmd === 'dfrac' || cmd === 'tfrac') {
+              const [num, p1] = readBraceGroup(tex, i);
+              const [den, p2] = readBraceGroup(tex, p1);
+              i = p2;
+              out += `<span class="math-frac"><span class="math-num">${parseTexExpr(num)}</span><span class="math-den">${parseTexExpr(den)}</span></span>`;
+              continue;
+            }
+            if (cmd === 'sqrt') {
+              let rootIdx = '';
+              if (tex[i] === '[') {
+                const closeB = tex.indexOf(']', i);
+                if (closeB !== -1) {
+                  rootIdx = `<sup>${parseTexExpr(tex.slice(i + 1, closeB))}</sup>`;
+                  i = closeB + 1;
+                }
+              }
+              const [rad, p1] = readBraceGroup(tex, i);
+              i = p1;
+              out += `<span class="math-sqrt">${rootIdx}√<span class="math-sqrt-rad">${parseTexExpr(rad)}</span></span>`;
+              continue;
+            }
+            if (cmd === 'sum' || cmd === 'prod' || cmd === 'int' || cmd === 'oint' || cmd === 'lim') {
+              const sym = cmd === 'sum' ? '∑' : cmd === 'prod' ? '∏' : cmd === 'int' ? '∫' : cmd === 'oint' ? '∮' : 'lim';
+              let sub = '', sup = '';
+              while (i < tex.length && (tex[i] === '_' || tex[i] === '^' || tex[i] === ' ')) {
+                if (tex[i] === ' ') { i++; continue; }
+                const type = tex[i];
+                const [grp, pNext] = readBraceGroup(tex, i + 1);
+                i = pNext;
+                if (type === '_') sub = parseTexExpr(grp);
+                else sup = parseTexExpr(grp);
+              }
+              if (sub || sup) {
+                out += `<span class="math-op-stack"><span class="math-op-sup">${sup}</span><span class="math-op-sym">${sym}</span><span class="math-op-sub">${sub}</span></span>`;
+              } else {
+                out += `<span class="math-op-sym">${sym}</span>`;
+              }
+              continue;
+            }
+            if (cmd === 'text' || cmd === 'textrm' || cmd === 'mathrm' || cmd === 'operatorname') {
+              const [txt, p1] = readBraceGroup(tex, i);
+              i = p1;
+              out += `<span>${escapeHtml(txt)}</span>`;
+              continue;
+            }
+            if (cmd === 'mathbf' || cmd === 'boldsymbol' || cmd === 'mathbb') {
+              const [txt, p1] = readBraceGroup(tex, i);
+              i = p1;
+              out += `<strong>${parseTexExpr(txt)}</strong>`;
+              continue;
+            }
+            if (cmd === 'vec' || cmd === 'hat' || cmd === 'bar' || cmd === 'tilde' || cmd === 'dot') {
+              const [txt, p1] = readBraceGroup(tex, i);
+              i = p1;
+              const mark = cmd === 'vec' ? '⃗' : cmd === 'hat' ? '̂' : cmd === 'bar' ? '̄' : cmd === 'tilde' ? '̃' : '̇';
+              out += `${parseTexExpr(txt)}${mark}`;
+              continue;
+            }
+            if (cmd === 'left' || cmd === 'right') continue;
+            if (['sin','cos','tan','cot','sec','csc','arcsin','arccos','arctan','sinh','cosh','tanh','log','ln','exp','max','min','sup','inf','det','gcd'].includes(cmd)) {
+              out += `<span>${cmd}</span>`;
+              continue;
+            }
+            if (TEX_SYMBOLS[cmd]) {
+              out += TEX_SYMBOLS[cmd];
+              continue;
+            }
+            if (cmd === ',' || cmd === ';' || cmd === ' ') {
+              out += '&nbsp;';
+              continue;
+            }
+            if (cmd === '{' || cmd === '}' || cmd === '%' || cmd === '$' || cmd === '&' || cmd === '#') {
+              out += escapeHtml(cmd);
+              continue;
+            }
+            out += escapeHtml(cmd);
+            continue;
+          }
+        }
+
+        if (ch === '^' || ch === '_') {
+          const [grp, p1] = readBraceGroup(tex, i + 1);
+          i = p1;
+          const tag = ch === '^' ? 'sup' : 'sub';
+          out += `<${tag}>${parseTexExpr(grp)}</${tag}>`;
+          continue;
+        }
+
+        if (ch === '{') {
+          const [grp, p1] = readBraceGroup(tex, i);
+          i = p1;
+          out += parseTexExpr(grp);
+          continue;
+        }
+
+        if (/[a-zA-Z]/.test(ch)) {
+          out += `<span class="math-var">${ch}</span>`;
+          i++;
+          continue;
+        }
+
+        out += escapeHtml(ch);
+        i++;
+      }
+      return out;
+    }
+
+    function renderMathHtml(tex, isBlock) {
+      const rendered = parseTexExpr(tex.trim());
+      return isBlock
+        ? `<div class="math-block">${rendered}</div>`
+        : `<span class="math-inline">${rendered}</span>`;
+    }
+
+    /* 完整 Markdown + 数学公式 混合解析器 */
+    function renderInlineMarkdown(text) {
+      return escapeHtml(text)
+        .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
+        .replace(/~~([^~]+)~~/g, '<del>$1</del>')
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    }
+
+    function renderMarkdown(text) {
+      const tokens = [];
+      const hold = (html) => {
+        const idx = tokens.length;
+        tokens.push(html);
+        return `@@TOKEN_${idx}@@`;
+      };
+
+      let src = String(text).replace(/```([\w+-]*)\n([\s\S]*?)```/g, (_, lang, code) => {
+        const safeCode = escapeHtml(code.replace(/\n$/, ''));
+        return hold(
+          `<div class="code-wrap"><div class="code-header"><span>${escapeHtml(lang || 'code')}</span>` +
+          `<button class="copy-btn" onclick="copyCode(this)">复制</button></div>` +
+          `<pre><code>${safeCode}</code></pre></div>`
+        );
+      });
+
+      src = src.replace(/`([^`\n]+)`/g, (_, code) => hold(`<code>${escapeHtml(code)}</code>`));
+      src = src.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => hold(renderMathHtml(tex, true)));
+      src = src.replace(/\\\[([\s\S]+?)\\\]/g, (_, tex) => hold(renderMathHtml(tex, true)));
+      src = src.replace(/\\\((.+?)\\\)/g, (_, tex) => hold(renderMathHtml(tex, false)));
+      src = src.replace(/(^|[^\\$])\$([^\s$](?:[^$\n]*?[^\s$])?)\$(?!\d)/g, (_, pre, tex) => {
+        return pre + hold(renderMathHtml(tex, false));
+      });
+
+      const lines = src.split('\n');
+      const blocks = [];
+      let i = 0;
+
+      while (i < lines.length) {
+        const line = lines[i];
+        const trimmed = line.trim();
+
+        if (!trimmed) { i++; continue; }
+
+        if (/^@@TOKEN_\d+@@$/.test(trimmed)) {
+          blocks.push(trimmed);
+          i++;
+          continue;
+        }
+
+        if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+          blocks.push('<hr>');
+          i++;
+          continue;
+        }
+
+        const hMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+        if (hMatch) {
+          const level = hMatch[1].length;
+          blocks.push(`<h${level}>${renderInlineMarkdown(hMatch[2])}</h${level}>`);
+          i++;
+          continue;
+        }
+
+        if (trimmed.includes('|') && i + 1 < lines.length && /^\s*\|?[\s:-]+\|[\s|:-]*$/.test(lines[i + 1])) {
+          const parseRow = r => r.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+          const headers = parseRow(lines[i]);
+          i += 2;
+          const bodyRows = [];
+          while (i < lines.length && lines[i].trim().includes('|') && !/^\s*$/.test(lines[i])) {
+            bodyRows.push(parseRow(lines[i]));
+            i++;
+          }
+          const thHtml = headers.map(h => `<th>${renderInlineMarkdown(h)}</th>`).join('');
+          const trHtml = bodyRows.map(row => {
+            const cells = headers.map((_, ci) => `<td>${renderInlineMarkdown(row[ci] || '')}</td>`).join('');
+            return `<tr>${cells}</tr>`;
+          }).join('');
+          blocks.push(`<div class="table-wrap"><table><thead><tr>${thHtml}</tr></thead><tbody>${trHtml}</tbody></table></div>`);
+          continue;
+        }
+
+        if (/^>\s?/.test(trimmed)) {
+          const quoteLines = [];
+          while (i < lines.length && /^>\s?/.test(lines[i].trim())) {
+            quoteLines.push(renderInlineMarkdown(lines[i].trim().replace(/^>\s?/, '')));
+            i++;
+          }
+          blocks.push(`<blockquote>${quoteLines.join('<br>')}</blockquote>`);
+          continue;
+        }
+
+        if (/^[-*+]\s+/.test(trimmed)) {
+          const items = [];
+          while (i < lines.length && /^[-*+]\s+/.test(lines[i].trim())) {
+            items.push(`<li>${renderInlineMarkdown(lines[i].trim().replace(/^[-*+]\s+/, ''))}</li>`);
+            i++;
+          }
+          blocks.push(`<ul>${items.join('')}</ul>`);
+          continue;
+        }
+
+        if (/^\d+\.\s+/.test(trimmed)) {
+          const items = [];
+          while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
+            items.push(`<li>${renderInlineMarkdown(lines[i].trim().replace(/^\d+\.\s+/, ''))}</li>`);
+            i++;
+          }
+          blocks.push(`<ol>${items.join('')}</ol>`);
+          continue;
+        }
+
+        const paraLines = [];
+        while (
+          i < lines.length &&
+          lines[i].trim() !== '' &&
+          !/^(#{1,6}\s+|>\s?|[-*+]\s+|\d+\.\s+|(-{3,}|\*{3,}|_{3,})$|@@TOKEN_\d+@@$)/.test(lines[i].trim())
+        ) {
+          if (lines[i].includes('|') && i + 1 < lines.length && /^\s*\|?[\s:-]+\|[\s|:-]*$/.test(lines[i + 1])) {
+            break;
+          }
+          paraLines.push(renderInlineMarkdown(lines[i]));
+          i++;
+        }
+        if (paraLines.length > 0) {
+          blocks.push(`<p>${paraLines.join('<br>')}</p>`);
+        }
+      }
+
+      let finalHtml = blocks.join('\n');
+      for (let t = 0; t < tokens.length; t++) {
+        finalHtml = finalHtml.replace(`@@TOKEN_${t}@@`, tokens[t]);
+      }
+      return finalHtml;
+    }
+
+    window.copyCode = function(btn) {
+      const code = btn.closest('.code-wrap').querySelector('code').innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        btn.textContent = '已复制';
+        setTimeout(() => btn.textContent = '复制', 1500);
+      });
+    };
+
+    function renderMessages() {
+      const box = $('messages');
+      const chat = getCurrentChat();
+      box.innerHTML = '';
+      if (chat.messages.length === 0) {
+        box.innerHTML = `<div style="text-align:center;color:var(--muted);margin-top:15vh;font-size:14px;">
+          在下方输入消息或上传图片开始对话<br><span style="font-size:12px;">支持自定义 API 拉取模型、图片上传/截图粘贴、侧边栏收缩、纯黑/浅色主题与 Markdown/LaTeX 渲染</span>
+        </div>`;
+        return;
+      }
+      chat.messages.forEach(m => appendMessageDom(m.role, m.content, m.images));
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function appendMessageDom(role, content, images = []) {
+      const box = $('messages');
+      const row = document.createElement('div');
+      row.className = `msg-row ${role}`;
+
+      const roleDiv = document.createElement('div');
+      roleDiv.className = 'msg-role';
+      roleDiv.textContent = role === 'user' ? '你' : (config.model || 'AI');
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+
+      if (role === 'user') {
+        if (Array.isArray(images) && images.length > 0) {
+          const imgGrid = document.createElement('div');
+          imgGrid.className = 'msg-images';
+          images.forEach(src => {
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = '上传的图片';
+            img.onclick = () => openLightbox(src);
+            imgGrid.appendChild(img);
+          });
+          bubble.appendChild(imgGrid);
+        }
+        if (content) {
+          const textDiv = document.createElement('div');
+          textDiv.className = 'user-text-body';
+          textDiv.textContent = content;
+          bubble.appendChild(textDiv);
+        }
+      } else {
+        bubble.innerHTML = renderMarkdown(content);
+      }
+
+      row.appendChild(roleDiv);
+      row.appendChild(bubble);
+      box.appendChild(row);
+      box.scrollTop = box.scrollHeight;
+      return bubble;
+    }
+
+    function buildApiContent(msg) {
+      if (msg.role === 'user' && Array.isArray(msg.images) && msg.images.length > 0) {
+        const parts = [];
+        if (msg.content) {
+          parts.push({ type: 'text', text: msg.content });
+        }
+        msg.images.forEach(url => {
+          parts.push({
+            type: 'image_url',
+            image_url: { url }
+          });
+        });
+        return parts;
+      }
+      return msg.content;
+    }
+
+    /* 发送消息 */
+    async function sendMessage() {
+      if (abortController) {
+        abortController.abort();
+        abortController = null;
+        $('sendBtn').textContent = '发送';
+        return;
+      }
+
+      const input = $('promptInput');
+      const text = input.value.trim();
+      const imagesToSend = [...pendingImages];
+      if (!text && imagesToSend.length === 0) return;
+
+      const endpoint = resolveChatEndpoint(config.baseUrl);
+      if (!endpoint || !config.apiKey) {
+        openSettings();
+        return;
+      }
+
+      const chat = getCurrentChat();
+      if (chat.messages.length === 0) {
+        chat.title = text ? text.slice(0, 22) : `[图片对话]`;
+        renderChatList();
+      }
+
+      const userMsg = { role: 'user', content: text, images: imagesToSend };
+      chat.messages.push(userMsg);
+
+      input.value = '';
+      input.style.height = 'auto';
+      pendingImages = [];
+      renderPendingPreviews();
+      saveChats();
+
+      if (chat.messages.length === 1) $('messages').innerHTML = '';
+      appendMessageDom('user', text, imagesToSend);
+
+      const aiMsg = { role: 'assistant', content: '' };
+      chat.messages.push(aiMsg);
+      const bubble = appendMessageDom('assistant', '思考中...');
+
+      abortController = new AbortController();
+      $('sendBtn').textContent = '停止';
+
+      const payloadMessages = [];
+      if (config.system.trim()) {
+        payloadMessages.push({ role: 'system', content: config.system.trim() });
+      }
+      chat.messages.slice(0, -1).forEach(m => {
+        payloadMessages.push({
+          role: m.role,
+          content: buildApiContent(m)
+        });
+      });
+
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.apiKey.trim()}`
+          },
+          body: JSON.stringify({
+            model: config.model.trim() || 'gpt-4o-mini',
+            messages: payloadMessages,
+            stream: !!config.stream
+          }),
+          signal: abortController.signal
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errText.slice(0, 300)}`);
+        }
+
+        if (config.stream && res.body) {
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith('data:')) continue;
+              const dataStr = trimmed.slice(5).trim();
+              if (dataStr === '[DONE]') break;
+              try {
+                const json = JSON.parse(dataStr);
+                const delta = json.choices?.[0]?.delta?.content || '';
+                if (delta) {
+                  aiMsg.content += delta;
+                  bubble.innerHTML = renderMarkdown(aiMsg.content);
+                  $('messages').scrollTop = $('messages').scrollHeight;
+                }
+              } catch (_) {}
+            }
+          }
+        } else {
+          const data = await res.json();
+          aiMsg.content = data.choices?.[0]?.message?.content || JSON.stringify(data);
+          bubble.innerHTML = renderMarkdown(aiMsg.content);
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          aiMsg.content += '\n\n[已手动停止]';
+        } else {
+          aiMsg.content = `请求失败：${err.message}\n\n请检查：\n1. Base URL 与 API Key 是否正确\n2. 如果发送了图片，当前所选模型是否支持视觉 (Vision)\n3. 公司网络是否允许访问该 API 域名及跨域 (CORS)`;
+        }
+        bubble.innerHTML = renderMarkdown(aiMsg.content);
+      } finally {
+        abortController = null;
+        $('sendBtn').textContent = '发送';
+        saveChats();
+      }
+    }
+
+    function openSettings() {
+      $('cfgBaseUrl').value = config.baseUrl;
+      $('cfgApiKey').value = config.apiKey;
+      $('cfgModelInput').value = config.model;
+      $('cfgSystem').value = config.system;
+      $('cfgStream').checked = !!config.stream;
+      $('resolvedUrlHint').textContent = '对话接口: ' + (resolveChatEndpoint(config.baseUrl) || '-');
+      $('fetchStatusHint').className = 'hint';
+      $('fetchStatusHint').textContent = config.models?.length
+        ? `当前已缓存 ${config.models.length} 个模型，可点击“拉取模型”刷新`
+        : '提示：支持标准 /v1/models 接口自动获取列表';
+      renderModelSelectors();
+      $('settingsModal').classList.add('open');
+    }
+
+    $('cfgBaseUrl').oninput = (e) => {
+      $('resolvedUrlHint').textContent = '对话接口: ' + (resolveChatEndpoint(e.target.value) || '-');
+    };
+    $('openSettingsBtn').onclick = openSettings;
+    $('topSettingsBtn').onclick = openSettings;
+    $('closeSettingsBtn').onclick = () => $('settingsModal').classList.remove('open');
+    $('saveSettingsBtn').onclick = () => {
+      const chosenModel = $('cfgModelInput').value.trim() || $('cfgModelSelect').value.trim();
+      config = {
+        baseUrl: $('cfgBaseUrl').value.trim(),
+        apiKey: $('cfgApiKey').value.trim(),
+        model: chosenModel || 'gpt-4o-mini',
+        models: config.models || [],
+        system: $('cfgSystem').value,
+        stream: $('cfgStream').checked
+      };
+      saveConfig();
+      renderModelSelectors();
+      $('settingsModal').classList.remove('open');
+    };
+
+    $('newChatBtn').onclick = createNewChat;
+    $('clearMsgBtn').onclick = () => {
+      const chat = getCurrentChat();
+      chat.messages = [];
+      saveChats();
+      renderMessages();
+    };
+    $('sendBtn').onclick = sendMessage;
+    $('promptInput').onkeydown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    };
+    $('promptInput').oninput = function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 180) + 'px';
+    };
+
+    const savedSidebar = localStorage.getItem(STORAGE_SIDEBAR);
+    applySidebarState(savedSidebar !== null ? savedSidebar === '1' : window.innerWidth <= 760);
+    applyTheme(localStorage.getItem(STORAGE_THEME) || 'dark');
+    renderModelSelectors();
+    renderChatList();
+    renderMessages();
+  </script>
+</body>
+</html>
