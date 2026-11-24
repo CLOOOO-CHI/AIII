@@ -1,6 +1,6 @@
 import http.server, urllib.request, os
 
-TARGET_API = "https://你的真实API域名/v1"  # 例如 https://api.deepseek.com/v1
+TARGET_API = "https://pucoding.com/v1"  # 例如 https://api.deepseek.com/v1
 
 class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
